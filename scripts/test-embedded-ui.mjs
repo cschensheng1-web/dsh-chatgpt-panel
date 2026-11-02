@@ -6,13 +6,8 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:1200,height:800}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- const mutations=[];
- await page.route('**/api/dsh-chatgpt-panel/**',async route=>{
-  const req=route.request();const name=new URL(req.url()).pathname.split('/').pop();
-  if(req.method()==='GET')return route.fulfill({json:{chats:[],activeId:null,busy:false,enabled:false,browserOpen:false}});
-  mutations.push(name);assert.equal(name,'enable');assert.deepEqual(req.postDataJSON(),{enabled:false});
-  return route.fulfill({json:{ok:true}});
- });
+ const apiRequests=[];
+ await page.route('**/api/dsh-chatgpt-panel/**',async route=>{apiRequests.push(route.request().url());await route.abort();});
  await page.addInitScript(()=>{
   window.__embeddedFixture={acquired:[],released:[],loaded:[]};
   window.dshDesktop={browser:{
@@ -41,12 +36,9 @@ try {
  await page.waitForFunction(()=>window.__embeddedFixture.released.length===1);
  await page.getByRole('button',{name:'返回 Chat 预览',exact:true}).click();
  await page.locator('webview[data-fixture-url]').waitFor();
- await page.getByText('其他选项',{exact:true}).click();
- await page.getByRole('button',{name:'查看旧版面板记录（Chrome 方案）',exact:true}).click();
- await page.getByRole('button',{name:'在 DSH 内聊天',exact:true}).waitFor();
- await page.getByRole('button',{name:'在 DSH 内聊天',exact:true}).click();
- await page.locator('webview[data-fixture-url]').waitFor();
- assert.deepEqual(await page.evaluate(()=>window.__embeddedFixture.acquired),Array(3).fill('plugin:dsh-chatgpt-panel:official'));
- assert.ok(mutations.length>0);assert.ok(!mutations.includes('open'));assert.deepEqual(errors,[]);
- console.log('Embedded UI PASS: default native view, isolated guest bootstrap, Agent return, guest cleanup, legacy switch, no external Chrome launch. Local fixtures only.');
+ assert.deepEqual(await page.evaluate(()=>window.__embeddedFixture.acquired),Array(2).fill('plugin:dsh-chatgpt-panel:official'));
+ assert.equal(await page.getByText('其他选项',{exact:true}).count(),0);
+ assert.equal(await page.getByText('历史面板',{exact:true}).count(),0);
+ assert.deepEqual(apiRequests,[]);assert.deepEqual(errors,[]);
+ console.log('Embedded UI PASS: default native view, isolated guest bootstrap, Agent return, guest cleanup, no legacy entry or local chat API, no external Chrome launch. Local fixtures only.');
 } finally {await browser.close();await preview.close();}

@@ -3,7 +3,7 @@ import { EmbeddedBrowser, hasEmbeddedBrowser } from './embedded-browser.mjs';
 
 export function embeddedAvailable() { return hasEmbeddedBrowser(window.dshDesktop?.browser); }
 
-export function EmbeddedChat({ ctx, onLegacy }) {
+export function EmbeddedChat({ ctx }) {
   const host = useRef(null);
   const browser = useRef(null);
   const [status, setStatus] = useState({ loading: true, error: '' });
@@ -31,6 +31,5 @@ export function EmbeddedChat({ ctx, onLegacy }) {
     {status.loading && <div className="dcp-embedded-status" role="status">正在打开官网…</div>}
     {status.error && <div className="dcp-embedded-error" role="alert">{status.error}</div>}
     <div ref={host} className="dcp-embedded-host" />
-    <details className="dcp-embedded-options"><summary>其他选项</summary><button onClick={onLegacy}>查看旧版面板记录（Chrome 方案）</button></details>
   </section>;
 }

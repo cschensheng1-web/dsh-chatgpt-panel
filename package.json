@@ -1,7 +1,7 @@
 {
   "name": "dsh-chatgpt-panel",
-  "version": "0.1.0-preview.5",
-  "description": "DeepSeek website embedded in DSH Desktop, with a preserved experimental Chrome chat panel.",
+  "version": "0.1.0-preview.6",
+  "description": "Embed chat.deepseek.com in DSH Desktop without a separate Chrome window.",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {
@@ -40,22 +40,15 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "preview": "node scripts/build.mjs && node scripts/preview.mjs",
     "check": "npm run build && npm test",
-    "test:ui": "node scripts/build.mjs && node scripts/test-ui.mjs",
-    "test:dom": "node scripts/test-dom.mjs",
-    "test:browser": "node scripts/test-browser-lifecycle.mjs",
-    "test:embedded": "node scripts/build.mjs && node scripts/test-embedded-ui.mjs"
-  },
-  "dependencies": {
-    "playwright-core": "1.56.1"
+    "test:ui": "node scripts/build.mjs && node scripts/test-embedded-ui.mjs",
+    "preview": "node scripts/build.mjs && node scripts/preview.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12",
-    "marked": "16.4.1",
-    "dompurify": "3.3.0",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "playwright-core": "1.56.1"
   },
   "repository": {
     "type": "git",
