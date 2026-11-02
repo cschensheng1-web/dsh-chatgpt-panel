@@ -53,7 +53,7 @@ export class WorkBridge {
       if (state.running) throw Error('Work 仍在运行，请等回复完成后再读取。');
       const window = (binding.eventSource || binding.session.eventSource).getSnapshot();
       for (const entry of [...window.entries].reverse()) {
-        const event = entry.type === 'event' ? entry.event : entry;
+        const event = entry.event ?? entry;
         if (event.type !== 'assistant/message' || event.surfaceOp !== 'append') continue;
         const blocks = event.data?.message?.content;
         if (!Array.isArray(blocks)) continue;

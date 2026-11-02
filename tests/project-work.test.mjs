@@ -67,7 +67,7 @@ test('reading Work only imports completed public answer text, excluding reasonin
   f.ctx.sessions.retain = () => ({ ready: Promise.resolve(), release() { released = true; }, binding: {
     session: { getSnapshot: () => ({ openState: 'open', running: false }) }, eventSource: { getSnapshot: () => ({ entries: [
       { type: 'user/message', data: { message: { content: [{ type: 'text', text: 'private instruction' }] } } },
-      { type: 'assistant/message', surfaceOp: 'append', data: { message: { content: [{ type: 'text', text: '已完成' }, { type: 'reasoning', text: 'hidden reasoning' }, { type: 'tool-call', arguments: 'secret' }] } } },
+      { kind: 'durable', event: { type: 'assistant/message', surfaceOp: 'append', data: { message: { content: [{ type: 'text', text: '已完成' }, { type: 'reasoning', text: 'hidden reasoning' }, { type: 'tool-call', arguments: 'secret' }] } } } },
     ] }) },
   } });
   assert.equal(await new WorkBridge(f.ctx).readLatest('work-1'), '已完成'); assert.equal(released, true);
