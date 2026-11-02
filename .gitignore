@@ -1,0 +1,11 @@
+node_modules/
+.preview-data/
+*.tgz
+.DS_Store
+.env
+.env.*
+browser-profile/
+plugin-data/
+chats.json
+chats.json.tmp
+*.log

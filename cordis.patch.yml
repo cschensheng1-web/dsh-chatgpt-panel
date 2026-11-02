@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-chatgpt-panel
+      name: dsh-chatgpt-panel
+      config: {}

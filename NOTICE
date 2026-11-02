@@ -1,0 +1,14 @@
+DSH ChatGPT-style panel, preview implementation (2026).
+
+Research reference: xmuwenxiang/dsh-web-chat
+https://github.com/xmuwenxiang/dsh-web-chat
+Audited upstream revision: 835e501ea40738de4f0bc3e63c406a9f416984cd (Apache-2.0).
+The reference informed the web companion architecture and DOM selector research.
+This package replaces the transport and UI integration; it does not bundle upstream
+network capture, agent tools, distillation calls, or system-prompt registration.
+
+DeepSeek and ChatGPT are trademarks of their respective owners. This is an
+independent experimental plugin, not an official DeepSeek or OpenAI product.
+
+Bundled browser dependencies retain their license comments in lib/client.js.
+Runtime dependencies and their licenses are installed by the package manager.
