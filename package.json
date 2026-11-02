@@ -1,6 +1,6 @@
 {
   "name": "dsh-chatgpt-panel",
-  "version": "0.1.0-preview.3",
+  "version": "0.1.0-preview.4",
   "description": "ChatGPT-style DeepSeek web companion for DSH Desktop (experimental DOM bridge, no paid model fallback)",
   "type": "module",
   "license": "Apache-2.0",

@@ -282,3 +282,25 @@ test('close during a pending browser launch closes the eventual context', async 
   assert.equal(contextClosed, true);
   assert.equal((await engine.status()).opened, false);
 });
+
+test('a thinking-only assistant can become the reply without a false extra-user error', async t=>{
+  const thinking=assistant('a1','');
+  const page=new FakePage({after:[snapshot([user('u1','Hello'),thinking]),snapshot([user('u1','Hello'),assistant('a1','Final answer',{terminalActions:true})])]});
+  const {engine}=await engineFor(t,page);
+  const result=await engine.send({text:'Hello',url:chat});
+  assert.equal(result.status,'complete');assert.equal(result.turnMessages[1].content,'Final answer');assert.equal(page.pressed,1);
+});
+
+test('sync reads an existing answer without typing or submitting any message', async t=>{
+  const page=new FakePage({before:snapshot([user('u1','Hello'),assistant('a1','Already answered',{terminalActions:true})])});
+  const {engine}=await engineFor(t,page);
+  const result=await engine.sync({url:chat,text:'Hello'});
+  assert.equal(result.status,'complete');assert.equal(result.turnMessages[1].content,'Already answered');
+  assert.equal(page.pressed,0);assert.deepEqual(page.fills,[]);
+});
+
+test('sync refuses a later different user message instead of attaching its reply', async t=>{
+  const page=new FakePage({before:snapshot([user('u1','Hello'),assistant('a1','First'),user('u2','Different'),assistant('a2','Other',{terminalActions:true})])});
+  const {engine}=await engineFor(t,page);
+  await assert.rejects(engine.sync({url:chat,text:'Hello'}),/后续新消息/);assert.equal(page.pressed,0);
+});

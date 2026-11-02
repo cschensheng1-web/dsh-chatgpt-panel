@@ -247,7 +247,6 @@ export class DeepSeekWebEngine {
       await composer.press('Enter', { timeout: 10000 });
       const deadline = Date.now() + this.timeoutMs;
       let userKey = null;
-      let sawGenerating = false;
       let boundAssistantKey = null;
       while (Date.now() < deadline && !this.closed) {
         const snapshot = await this._read();
@@ -261,7 +260,6 @@ export class DeepSeekWebEngine {
         }
         if (snapshot.truncated) return this._emit(result('partial', '页面快照超出安全读取范围，已停止读取。'), onSnapshot);
         title = snapshot.title || title;
-        sawGenerating ||= snapshot.stopPresent;
         if (!userKey) {
           const candidates = snapshot.messages.filter(message => !baselineKeys.has(message.key) &&
             message.role === 'user' && normalizeText(message.content) === normalizeText(text));
@@ -290,10 +288,10 @@ export class DeepSeekWebEngine {
           }
           if (this.stopped) return this._emit(result('partial', '已请求停止；保留目前可见内容。'), onSnapshot);
           // Text stability is never an end signal. Require a new assistant
-          // message's explicit terminal state, or observed generation plus
-          // its own terminal action controls and the restored composer.
+          // message's explicit terminal state, or its own terminal action
+          // controls and the restored composer (including fast replies).
           const complete = canonical && assistant?.content && !snapshot.stopPresent &&
-            (assistant.explicitComplete || (sawGenerating && assistant.terminalActions && snapshot.composer));
+            (assistant.explicitComplete || (assistant.terminalActions && snapshot.composer));
           if (complete) return this._emit(result('complete'), onSnapshot);
           await this._emit(result('partial', '正在读取官网可见回复；结束状态尚未确认。'), onSnapshot);
         }
@@ -328,6 +326,43 @@ export class DeepSeekWebEngine {
       }
     }
     return { stopped: false, reason: '未识别到可见的官网停止按钮；请在官网操作。' };
+  }
+
+  async sync({ url, text }) {
+    const target = validateChatUrl(url);
+    if (activeSend || this.busy) throw failure('BUSY', '请先等待当前回复结束。');
+    activeSend = this;
+    this.busy = true;
+    try {
+      if (this.pausedReason) throw failure('PLATFORM_BLOCK', `${this.pausedReason} 请处理后重新打开官网窗口。`);
+      await this._ensureBrowser();
+      if (this.page.url() !== target) await this.page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const deadline = Date.now() + Math.min(this.timeoutMs, 15000);
+      let response;
+      while (Date.now() < deadline && !this.closed) {
+        const snapshot = await this._read();
+        if (snapshot.url !== target) throw failure('NAVIGATION_CHANGED', '官网会话发生变化，请在官网核对。');
+        if (snapshot.blocked) { this.pausedReason = snapshot.blockedReason; throw failure('PLATFORM_BLOCK', snapshot.blockedReason); }
+        if (snapshot.truncated) throw failure('UNSUPPORTED_PAGE', '官网内容过长，无法安全同步。');
+        const users = snapshot.messages.filter(message => message.role === 'user');
+        const user = users.at(-1);
+        if (user && normalizeText(user.content) !== normalizeText(text)) throw failure('TURN_CHANGED', '官网有后续新消息，请先在官网核对本条对话。');
+        if (user) {
+          const index = snapshot.messages.findIndex(message => message.key === user.key);
+          const assistant = snapshot.messages.slice(index + 1).find(message => message.role === 'assistant');
+          if (assistant?.content) {
+            const complete = !snapshot.stopPresent && (assistant.explicitComplete || (assistant.terminalActions && snapshot.composer));
+            response = { url: target, status: complete ? 'complete' : 'partial', turnMessages: [{ role: 'user', content: text }, { role: 'assistant', content: assistant.content }],
+              ...(complete ? {} : { reason: '已同步可见回复；官网结束状态尚未确认。' }) };
+            if (complete) return response;
+          }
+        }
+        await sleep(this.pollIntervalMs);
+      }
+      if (response) return response;
+      throw failure('NO_VISIBLE_REPLY', '还未找到这条消息的可见回复，请先在官网确认。');
+    } catch (error) { throw failure('SYNC_FAILED', browserErrorMessage(error)); }
+    finally { this.busy = false; if (activeSend === this) activeSend = undefined; }
   }
 
   async close() {

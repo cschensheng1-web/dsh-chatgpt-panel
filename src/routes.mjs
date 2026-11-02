@@ -46,6 +46,21 @@ export function createRoutes({ store, engine }) {
     route('/new', 'POST', () => { idle(); return store.create(); }),
     route('/select', 'POST', b => { store.select(b.id); }),
     route('/delete', 'POST', b => { idle(); store.delete(b.id); }),
+    route('/sync', 'POST', async b => {
+      if (!enabled) throw Error('请先启用官网连接。');
+      idle();
+      const chat = store.get(b.id);
+      if (!chat.url) throw Error('此记录没有官网会话地址，请先在官网核对。');
+      const index = chat.messages.findLastIndex(message => message.role === 'user');
+      if (index < 0) throw Error('此对话没有可同步的消息。');
+      const text = chat.messages[index].content;
+      busy = true;
+      try {
+        const value = await engine.sync({ url: chat.url, text });
+        if (value.turnMessages?.[0]?.content !== text) throw Error('回复归属未确认，已停止同步。');
+        store.snapshot(chat.id, { ...value, messages: [...chat.messages.slice(0, index), ...value.turnMessages] });
+      } finally { busy = false; }
+    }),
     route('/send', 'POST', b => {
       if (!enabled) throw Error('实验网页连接尚未启用；不会调用付费 API。');
       idle();

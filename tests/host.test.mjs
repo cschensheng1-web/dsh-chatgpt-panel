@@ -20,7 +20,7 @@ function fixture(t, send = async()=>({ messages:[],status:'complete' })) {
     await route.handler(request(method,body,headers),res);
     return {status,body:value};
   }
-  return {store,dir,call,app,calls:()=>calls};
+  return {store,dir,call,app,engine,calls:()=>calls};
 }
 
 test('host and origin guards reject lookalikes, cross-site and state-changing GET',t=>{
@@ -97,4 +97,14 @@ test('old browser launch logs are shortened in state without changing user messa
   assert.match(view.error,/专用 Chrome/);
   assert.doesNotMatch(view.error,/\/Users\/|pid=|ProcessSingleton/);
   assert.equal(view.messages[0].content,userText);
+});
+
+test('sync restores the pending turn and preserves prior local history without sending',async t=>{
+  const f=fixture(t);const c=f.store.create();c.url='https://chat.deepseek.com/a/chat/s/test';
+  c.messages=[{role:'user',content:'old'},{role:'assistant',content:'old answer'},{role:'user',content:'pending'}];c.status='partial';f.store.save();
+  let synced=0;f.engine.sync=async input=>{synced++;assert.equal(input.url,c.url);return {url:c.url,status:'complete',turnMessages:[{role:'user',content:input.text},{role:'assistant',content:'existing website reply'}]};};
+  assert.equal((await f.call('sync',{id:c.id})).status,400);
+  await f.call('enable',{enabled:true});assert.equal((await f.call('sync',{id:c.id,url:'https://attacker.test/'})).status,200);
+  assert.equal(synced,1);assert.equal(f.calls(),0);assert.equal(c.status,'complete');
+  assert.deepEqual(c.messages.map(m=>m.content),['old','old answer','pending','existing website reply']);
 });

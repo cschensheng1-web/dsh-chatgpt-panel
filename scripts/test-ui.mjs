@@ -18,6 +18,7 @@ try {
     if(path==='new') {const c={id:'fixture-new',title:'新对话',updatedAt:Date.now(),url:null,messages:[],status:'idle'};state={...state,chats:[c,...state.chats],activeId:c.id};return route.fulfill({json:c});}
     if(path==='enable')state.enabled=body.enabled;
     if(path==='send') {sends++;assert.equal(body.id,'fixture-new');if(failSend)return route.fulfill({status:400,json:{error:'本地夹具：发送未确认'}});state.chats[0].messages=[{role:'user',content:body.text},{role:'assistant',content:'### 测试回复\n\n```js\nconsole.log("你好");\n```\n\n- 一条列表\n- 另一条列表\n\n<script>window.__unsafe=1</script><img src=x onerror="window.__unsafe=2">[危险](javascript:alert(1))'}];state.chats[0].title='界面测试示例';state.chats[0].status='complete';}
+    if(path==='sync'){state.chats[0].status='complete';state.chats[0].messages[1].content='从官网同步的既有回复';}
     if(path==='stop'){state.busy=false;state.chats[0].status='complete';}
     if(path==='delete'){state.chats=state.chats.filter(c=>c.id!==body.id);state.activeId=state.chats[0]?.id??null;}
     return route.fulfill({json:{ok:true}});
@@ -49,6 +50,12 @@ try {
   await page.getByRole('button',{name:'停止回复',exact:true}).click();
   await page.waitForFunction(()=>!document.querySelector('.dcp-send.is-stop'));
   assert.ok(mutations.includes('stop'));
+  state.chats[0].status='partial';state.chats[0].url='https://chat.deepseek.com/a/chat/s/fixture';
+  await page.getByRole('button',{name:'同步官网回复',exact:true}).waitFor();
+  const beforeSyncSends=sends;
+  await page.getByRole('button',{name:'同步官网回复',exact:true}).click();
+  await page.getByText('从官网同步的既有回复',{exact:true}).waitFor();
+  assert.equal(sends,beforeSyncSends);assert.ok(mutations.includes('sync'));
   state.chats[0].messages[0].content='帮我整理一下插件开发方案';
   state.chats[0].messages[1].content='### 可以这样安排\n\n1. 先核实桌面版插件接口。\n2. 完成聊天历史与消息布局。\n3. 用本地测试页面检查交互。\n\n```js\nconsole.log("你好，DeepSeek");\n```\n\n真实网页登录和聊天还需要在你的客户端中验证。';
   state.chats[0].title='讨论插件开发方案';

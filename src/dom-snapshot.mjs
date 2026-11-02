@@ -143,18 +143,23 @@ export function readVisibleDom() {
     const key = item.getAttribute('data-virtual-list-item-key') ?? item.getAttribute('data-message-id');
     if (!key || key.length > 512) continue;
     const assistant = item.matches('.ds-assistant-message-main-content') ? item : item.querySelector('.ds-assistant-message-main-content');
+    const thinking = item.matches('.ds-think-content') ? item : item.querySelector('.ds-think-content');
+    const user = item.matches('.ds-collapsible-text') ? item : item.querySelector('.ds-collapsible-text');
     const declaredRole = item.getAttribute('data-message-role');
-    const role = declaredRole === 'assistant' || assistant ? 'assistant' : declaredRole === 'user' || item.hasAttribute('data-virtual-list-item-key') ? 'user' : null;
+    // The assistant's main body is absent while it is thinking or mounting.
+    // A virtual-list key is only an identity, never proof of a user message.
+    const role = declaredRole === 'assistant' || assistant || thinking ? 'assistant' : declaredRole === 'user' || user ? 'user' : null;
     if (!role) continue;
-    let body = assistant ?? item;
-    if (role === 'assistant') body = body.matches('.ds-markdown') ? body : body.querySelector('.ds-markdown') ?? body;
-    const contentTree = tree(body);
-    const status = item.getAttribute('data-status') ?? body.getAttribute('data-status') ?? '';
+    let body = role === 'assistant' ? assistant : user ?? item;
+    if (!body && declaredRole === 'assistant' && !thinking) body = item;
+    if (role === 'assistant' && body) body = body.matches('.ds-markdown') ? body : body.querySelector('.ds-markdown') ?? body;
+    const contentTree = body ? tree(body) : null;
+    const status = item.getAttribute('data-status') ?? body?.getAttribute('data-status') ?? '';
     const actions = Array.from(item.querySelectorAll('button,[role="button"]')).filter(visible).map(label);
     messages.push({
       key, role, tree: contentTree,
       explicitComplete: /^(?:complete|completed|finished|done)$/.test(status),
-      terminalActions: actions.some(value => /重新生成|再生成|Regenerate|Retry response/i.test(value)),
+      terminalActions: actions.some(value => /重新生成|再生成|Regenerate|Retry response|^Read aloud\b|^朗读/i.test(value)),
     });
   }
   const allTextareas = Array.from(document.querySelectorAll('textarea'));

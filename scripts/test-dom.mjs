@@ -21,9 +21,9 @@ const composer = '<textarea id="chat-input" placeholder="给 DeepSeek 发送消�
 
 try {
   await fixture('rendered roles, stable keys, Markdown/code/lists and terminal controls', `
-    <div data-virtual-list-item-key="u-old"><p>Old question</p><button>Copy</button></div>
+    <div data-virtual-list-item-key="u-old"><div class="ds-collapsible-text"><p>Old question</p></div><button>Copy</button></div>
     <div data-virtual-list-item-key="a-old"><div class="ds-assistant-message-main-content ds-markdown"><p>Old answer</p></div></div>
-    <div data-virtual-list-item-key="u-new"><p>First paragraph</p><p>Second paragraph</p></div>
+    <div data-virtual-list-item-key="u-new"><div class="ds-collapsible-text"><p>First paragraph</p><p>Second paragraph</p></div></div>
     <div data-virtual-list-item-key="a-new" data-status="complete">
       <div class="ds-assistant-message-main-content ds-markdown">
         <h2>Answer</h2><p>A <strong>safe</strong> answer.</p>
@@ -49,6 +49,20 @@ try {
     assert.equal(answer.terminalActions, true);
     assert.equal(value.blocked, false);
     assert.equal(value.composer.index, 0);
+  });
+  await fixture('thinking-only assistant and empty placeholders are never classified as users', `
+    <div data-virtual-list-item-key="u"><div class="ds-collapsible-text">Hello</div></div>
+    <div data-virtual-list-item-key="a"><div class="ds-think-content"><div class="ds-markdown">PRIVATE_THOUGHT_FIXTURE</div></div></div>
+    <div data-virtual-list-item-key="mounting"></div>${composer}`, value => {
+    assert.deepEqual(value.messages.map(m => m.role), ['user','assistant']);
+    assert.equal(value.messages[1].content, '');
+    assert.ok(!JSON.stringify(value.messages).includes('PRIVATE_THOUGHT_FIXTURE'));
+  });
+  await fixture('completed current-page assistant exposes its own Read aloud terminal control', `
+    <div data-virtual-list-item-key="a"><div class="ds-markdown ds-assistant-message-main-content"><p>Final reply</p></div><div role="button" aria-label="Read aloud"></div></div>${composer}`, value => {
+    assert.equal(value.messages[0].role,'assistant');
+    assert.equal(value.messages[0].content,'Final reply');
+    assert.equal(value.messages[0].terminalActions,true);
   });
   await fixture('visible official stop affordance is observed', `<button aria-label="Stop generating">Stop generating</button>${composer}`, value => {
     assert.equal(value.stopPresent, true);
