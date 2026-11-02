@@ -1,6 +1,6 @@
 # DSH Mac 兼容性与核实依据
 
-核实日期：2026-11-02。本交付为实验预览，目标是官方 DeepSeek Harness Desktop；社区同名 Mac 包装不自动兼容。
+核实日期：2026-11-02。preview.5 默认提供官网内嵌页面；详细实现、临时登录会话限制和实测范围见 [内嵌说明](EMBEDDED.zh-CN.md)。本交付为实验预览，目标是官方 DeepSeek Harness Desktop；社区同名 Mac 包装不自动兼容。
 
 ## 已核实的环境与接口
 

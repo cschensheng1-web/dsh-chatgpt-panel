@@ -1,7 +1,7 @@
 {
   "name": "dsh-chatgpt-panel",
-  "version": "0.1.0-preview.4",
-  "description": "ChatGPT-style DeepSeek web companion for DSH Desktop (experimental DOM bridge, no paid model fallback)",
+  "version": "0.1.0-preview.5",
+  "description": "DeepSeek website embedded in DSH Desktop, with a preserved experimental Chrome chat panel.",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {
@@ -44,7 +44,8 @@
     "check": "npm run build && npm test",
     "test:ui": "node scripts/build.mjs && node scripts/test-ui.mjs",
     "test:dom": "node scripts/test-dom.mjs",
-    "test:browser": "node scripts/test-browser-lifecycle.mjs"
+    "test:browser": "node scripts/test-browser-lifecycle.mjs",
+    "test:embedded": "node scripts/build.mjs && node scripts/test-embedded-ui.mjs"
   },
   "dependencies": {
     "playwright-core": "1.56.1"

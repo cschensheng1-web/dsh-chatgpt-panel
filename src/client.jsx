@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import css from './panel.css';
+import { EmbeddedChat, embeddedAvailable } from './EmbeddedChat.jsx';
 
 const PANEL_ID = 'dsh-chatgpt-panel';
 const API_BASE = '/api/dsh-chatgpt-panel';
@@ -100,7 +101,7 @@ function formatDate(value) {
   return parsed.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
 }
 
-export function ChatPanel({ ctx }) {
+export function ChatPanel({ ctx, onEmbedded }) {
   const [state, setState] = useState(EMPTY_STATE);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -223,7 +224,7 @@ export function ChatPanel({ ctx }) {
     {mobileSidebar && <button className="dcp-sidebar-mask" aria-label="关闭历史记录" onClick={() => setMobileSidebar(false)} />}
     <main className="dcp-main">
       <header className="dcp-topbar"><div className="dcp-heading"><button className="dcp-icon dcp-mobile-menu" aria-label="打开历史记录" onClick={() => setMobileSidebar(true)}><Icon kind="menu" /></button><span>DeepSeek Chat</span><span className="dcp-web-badge">网页</span></div><div className="dcp-top-actions"><div className="dcp-mode" aria-label="工作模式"><button className="is-active" aria-pressed="true">Chat</button><button onClick={agent} aria-label="返回 DSH 原生 Agent">Agent</button></div><button className="dcp-icon" onClick={() => setShowSettings(value => !value)} aria-label="聊天设置" title="聊天设置"><Icon kind="settings" /></button></div></header>
-      <div className="dcp-route-note"><span className="dcp-route-dot" />官网网页聊天<span className="dcp-route-separator">·</span>Agent 使用 DSH 原有配置<button onClick={official}>打开官网<Icon kind="external" size={12} /></button></div>
+      <div className="dcp-route-note">{onEmbedded && <button className="dcp-embedded-entry" disabled={busy} onClick={() => void onEmbedded().catch(failure => setError(failure.message))}>在 DSH 内聊天</button>}<span className="dcp-route-dot" />官网网页聊天<span className="dcp-route-separator">·</span>Agent 使用 DSH 原有配置<button onClick={official}>打开官网<Icon kind="external" size={12} /></button></div>
 
       {error && <div className="dcp-alert" role="alert"><span>{error}</span><button className="dcp-icon" onClick={() => setError('')} aria-label="关闭错误提示"><Icon kind="close" size={15} /></button></div>}
       {active?.error && <div className="dcp-alert" role="status">{active.error}</div>}
@@ -244,7 +245,25 @@ export function apply(ctx) {
     console.warn('[dsh-chatgpt-panel] This DSH version does not expose the required main/sidebar panel API.');
     return;
   }
-  const Panel = () => <ChatPanel ctx={ctx} />;
+  const Panel = () => {
+    const [mode, setMode] = useState(() => {
+      if (!embeddedAvailable()) return 'legacy';
+      try { return localStorage.getItem('dsh-chatgpt-panel-view') === 'legacy' ? 'legacy' : 'embedded'; } catch { return 'embedded'; }
+    });
+    const choose = next => {
+      setMode(next);
+      try { localStorage.setItem('dsh-chatgpt-panel-view', next); } catch { /* optional preference only */ }
+    };
+    const enterEmbedded = async () => {
+      await request('enable', { enabled: false });
+      choose('embedded');
+    };
+    useEffect(() => {
+      if (mode === 'embedded') void request('enable', { enabled: false }).catch(() => {});
+    }, [mode]);
+    return mode === 'embedded' ? <EmbeddedChat ctx={ctx} onLegacy={() => choose('legacy')} />
+      : <ChatPanel ctx={ctx} onEmbedded={embeddedAvailable() ? enterEmbedded : undefined} />;
+  };
   const PanelIcon = () => <Icon kind="chat" size={18} />;
   try {
     ctx.effect(() => {
