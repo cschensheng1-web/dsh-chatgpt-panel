@@ -88,3 +88,13 @@ test('viewport snapshots cannot truncate durable history',async t=>{
   await f.call('enable',{enabled:true});await f.call('send',{id:c.id,text:'new question'});await new Promise(r=>setImmediate(r));
   assert.deepEqual(f.store.get(c.id).messages.map(m=>m.content),['old question','old answer','new question','new response']);
 });
+
+test('old browser launch logs are shortened in state without changing user messages', t=>{
+  const f=fixture(t);const c=f.store.create();
+  const userText='Please explain ProcessSingleton';c.messages=[{role:'user',content:userText}];
+  f.store.fail(c.id,'browserType.launchPersistentContext: [pid=123] ProcessSingleton /Users/private/person/browser-profile');
+  const view=f.store.view().chats[0];
+  assert.match(view.error,/专用 Chrome/);
+  assert.doesNotMatch(view.error,/\/Users\/|pid=|ProcessSingleton/);
+  assert.equal(view.messages[0].content,userText);
+});

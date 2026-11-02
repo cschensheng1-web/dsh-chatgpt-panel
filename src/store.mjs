@@ -1,6 +1,7 @@
 import { mkdirSync, chmodSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { displayChatError } from './browser-errors.mjs';
 
 export function safeChatUrl(value) {
   if (value == null) return null;
@@ -35,7 +36,11 @@ export class ChatStore {
     chmodSync(temp, 0o600);
     renameSync(temp, this.file);
   }
-  view() { return structuredClone(this.data); }
+  view() {
+    const data = structuredClone(this.data);
+    for (const chat of data.chats) chat.error = displayChatError(chat.error);
+    return data;
+  }
   get(id) { const c = this.data.chats.find(c => c.id === id); if (!c) throw Error('对话不存在'); return c; }
   create() {
     if (this.data.chats.length >= 500) throw Error('本地历史已达 500 条，请先删除旧对话。');

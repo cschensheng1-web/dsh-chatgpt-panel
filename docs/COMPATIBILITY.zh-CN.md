@@ -63,7 +63,7 @@ dsh plugin --profile desktop add ./dsh-chatgpt-panel
 
 ## 尚未在用户真实客户端验证
 
-- 真实 Desktop profile 的安装、插件启用、主面板加载与卸载。
+- Desktop 插件管理器的 GitHub 下载、更新与卸载；本机配套 CLI 的本地安装、加载与浏览器复用已验证，见测试说明。
 - 用户自己的 `chat.deepseek.com` 登录、网页历史、真实回答和验证码流程。
 - 该 Mac 的 Chrome 可见窗口启动与多窗口行为。
 - 官方真实网络请求是否受地域、限流或反自动化策略影响。

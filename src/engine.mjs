@@ -2,10 +2,12 @@ import { mkdir, writeFile, chmod, lstat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { DEEPSEEK_ORIGIN, normalizeDomSnapshot, readVisibleDom, validateChatUrl } from './dom-snapshot.mjs';
+import { browserErrorMessage } from './browser-errors.mjs';
 
 // One user-triggered send at a time across every engine instance. There is no
 // queue: a second request is rejected and is never sent later unexpectedly.
 let activeSend;
+const profileOwners = new Map();
 const sleep = milliseconds => new Promise(resolveSleep => setTimeout(resolveSleep, milliseconds));
 const normalizeText = value => String(value).trim().replace(/\s+/g, ' ');
 const stopPattern = /^(?:停止|停止生成|停止回答|Stop|Stop generating|Stop response)(?:\s|$)/i;
@@ -13,6 +15,7 @@ const stopPattern = /^(?:停止|停止生成|停止回答|Stop|Stop generating|S
 function failure(code, message) {
   const error = new Error(message);
   error.code = code;
+  error.userMessage = message;
   return error;
 }
 
@@ -31,20 +34,21 @@ async function prepareProfile(profileDir) {
   await secureDirectory(profileDir);
   const defaultDir = join(profileDir, 'Default');
   await secureDirectory(defaultDir);
-  // This is this plugin's dedicated profile only. Never inspect a personal
-  // Chrome profile. Recreate these small preferences without reading account
-  // information, and disable Chrome's credential-saving service.
+  // Initialize this dedicated profile once, without reading existing account
+  // information or overwriting preferences held by a running Chrome process.
   const preferences = join(defaultDir, 'Preferences');
   const existing = await lstat(preferences).catch(error => {
     if (error.code === 'ENOENT') return null;
     throw error;
   });
   if (existing?.isSymbolicLink()) throw failure('UNSAFE_PROFILE', '浏览器设置文件不能是符号链接。');
-  await writeFile(preferences, JSON.stringify({
-    credentials_enable_service: false,
-    profile: { password_manager_enabled: false },
-    autofill: { profile_enabled: false, credit_card_enabled: false },
-  }), { mode: 0o600 });
+  try {
+    await writeFile(preferences, JSON.stringify({
+      credentials_enable_service: false,
+      profile: { password_manager_enabled: false },
+      autofill: { profile_enabled: false, credit_card_enabled: false },
+    }), { mode: 0o600, flag: 'wx' });
+  } catch (error) { if (error.code !== 'EEXIST') throw error; }
   await chmod(preferences, 0o600);
 }
 
@@ -69,6 +73,7 @@ export class DeepSeekWebEngine {
     this.context = null;
     this.page = null;
     this.opening = null;
+    this.closing = null;
     this.busy = false;
     this.stopped = false;
     this.closed = false;
@@ -76,22 +81,74 @@ export class DeepSeekWebEngine {
   }
 
   async _ensureBrowser() {
-    if (this.page && !this.page.isClosed()) return;
+    if (this.closing) await this.closing;
     if (this.opening) return this.opening;
     this.opening = (async () => {
-      await prepareProfile(this.profileDir);
-      const launch = this.launchBrowser ?? (async (directory, options) => {
-        const { chromium } = await import('playwright-core');
-        return chromium.launchPersistentContext(directory, options);
-      });
-      this.context = await launch(this.profileDir, {
-        channel: 'chrome', headless: false, viewport: null, acceptDownloads: false, chromiumSandbox: true,
-        args: ['--disable-save-password-bubble'],
-      });
-      this.page = this.context.pages()[0] ?? await this.context.newPage();
-      this.closed = false;
+      // A closed tab does not mean that its persistent browser has exited.
+      // Recover a live page in the owned context before considering a launch.
+      if (this.context) {
+        const context = this.context;
+        try {
+          this.page = await this._contextPage(context);
+          return;
+        } catch (error) {
+          if (!/Target.*closed|Browser.*closed|context.*closed/i.test(String(error.message))) throw error;
+          await this._closeContext(context);
+        }
+      }
+      const previous = profileOwners.get(this.profileDir);
+      if (previous && previous !== this) {
+        if (previous.closing) await previous.closing;
+        if (profileOwners.get(this.profileDir) && profileOwners.get(this.profileDir) !== this) {
+          throw failure('PROFILE_IN_USE', '插件的官网浏览器正由另一个实例使用，请关闭该专用窗口并重启 DSH 后再试。');
+        }
+      }
+      profileOwners.set(this.profileDir, this);
+      try {
+        await prepareProfile(this.profileDir);
+        const launch = this.launchBrowser ?? (async (directory, options) => {
+          const { chromium } = await import('playwright-core');
+          return chromium.launchPersistentContext(directory, options);
+        });
+        const context = await launch(this.profileDir, {
+          channel: 'chrome', headless: false, viewport: null, acceptDownloads: false, chromiumSandbox: true,
+          args: ['--disable-save-password-bubble'],
+        });
+        this.context = context;
+        context.on?.('close', () => {
+          if (this.context !== context) return;
+          this.context = null;
+          this.page = null;
+          this.closed = true;
+          if (profileOwners.get(this.profileDir) === this) profileOwners.delete(this.profileDir);
+        });
+        this.page = await this._contextPage(context);
+        this.closed = false;
+      } catch (error) {
+        if (this.context) await this._closeContext(this.context);
+        if (profileOwners.get(this.profileDir) === this) profileOwners.delete(this.profileDir);
+        throw failure('BROWSER_START_FAILED', browserErrorMessage(error));
+      }
     })().finally(() => { this.opening = null; });
     return this.opening;
+  }
+
+  async _contextPage(context) {
+    const pages = context.pages().filter(page => !page.isClosed());
+    if (this.page && pages.includes(this.page)) return this.page;
+    return pages.find(page => page.url().startsWith(`${DEEPSEEK_ORIGIN}/`))
+      ?? pages.find(page => page.url() === 'about:blank')
+      ?? await context.newPage();
+  }
+
+  async _closeContext(context) {
+    // Keep ownership until Chrome has actually released its profile lock.
+    await context.close();
+    if (this.context === context) {
+      this.context = null;
+      this.page = null;
+    }
+    if (profileOwners.get(this.profileDir) === this) profileOwners.delete(this.profileDir);
   }
 
   async _read() {
@@ -100,21 +157,23 @@ export class DeepSeekWebEngine {
   }
 
   async open() {
-    if (this.busy) {
-      await this.page?.bringToFront();
+    try {
+      if (this.busy) {
+        await this.page?.bringToFront();
+        return this.status();
+      }
+      await this._ensureBrowser();
+      const current = this.page.url();
+      if (current === 'about:blank' || !current.startsWith(`${DEEPSEEK_ORIGIN}/`)) {
+        await this.page.goto(`${DEEPSEEK_ORIGIN}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      }
+      await this.page.bringToFront();
+      const snapshot = await this._read();
+      // An explicit reopen after the user handles a verification page is the
+      // only way to release a latched platform block. Nothing retries a send.
+      this.pausedReason = snapshot.blocked ? snapshot.blockedReason : null;
       return this.status();
-    }
-    await this._ensureBrowser();
-    const current = this.page.url();
-    if (current === 'about:blank' || !current.startsWith(`${DEEPSEEK_ORIGIN}/`)) {
-      await this.page.goto(`${DEEPSEEK_ORIGIN}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    }
-    await this.page.bringToFront();
-    const snapshot = await this._read();
-    // An explicit reopen after the user handles a verification page is the
-    // only way to release a latched platform block. Nothing retries a send.
-    this.pausedReason = snapshot.blocked ? snapshot.blockedReason : null;
-    return this.status();
+    } catch (error) { throw failure('BROWSER_OPEN_FAILED', browserErrorMessage(error)); }
   }
 
   async status() {
@@ -244,7 +303,7 @@ export class DeepSeekWebEngine {
       return this._emit(result('partial', this.closed ? '官网浏览器已关闭。' :
         '等待超时或未识别到明确结束标记；仅保留已读取内容，请在官网确认。'), onSnapshot);
     } catch (error) {
-      return this._emit(result('partial', `操作中断，未自动重发：${error.code ?? error.message ?? '未知错误'}`), onSnapshot);
+      return this._emit(result('partial', `操作中断，未自动重发：${browserErrorMessage(error)}`), onSnapshot);
     } finally {
       this.busy = false;
       if (activeSend === this) activeSend = undefined;
@@ -272,16 +331,18 @@ export class DeepSeekWebEngine {
   }
 
   async close() {
+    if (this.closing) return this.closing;
     this.closed = true;
-    // A close while Chrome is still starting must also close the context
-    // that the pending launch eventually produces.
-    await this.opening?.catch(() => undefined);
-    this.closed = true;
-    const context = this.context;
-    this.context = null;
-    this.page = null;
-    await context?.close();
-    return { opened: false };
+    this.closing = (async () => {
+      // Wait both for a pending launch and for Chrome's shutdown. A concurrent
+      // open must not launch against a profile that is still shutting down.
+      await this.opening?.catch(() => undefined);
+      this.closed = true;
+      if (this.context) await this._closeContext(this.context);
+      if (profileOwners.get(this.profileDir) === this) profileOwners.delete(this.profileDir);
+      return { opened: false };
+    })();
+    try { return await this.closing; } finally { this.closing = null; }
   }
 }
 
