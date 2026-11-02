@@ -66,3 +66,21 @@ test('reload is only available after guest readiness and invokes the actual gues
  f.view.dispatchEvent(new Event('did-stop-loading'));assert.equal(f.states.at(-1).loading,false);
  await f.controller.dispose();assert.equal(f.controller.reload(),false);
 });
+
+test('context is read only on request, only from the official page, and normalizes its source',async()=>{
+ const f=fixture();let reads=0;f.view.getURL=()=> 'https://chat.deepseek.com/a/chat?token=not-kept';
+ f.view.executeJavaScript=async(code,userGesture)=>{reads++;assert.equal(userGesture,false);return {text:'两条消息',kind:'messages',count:2,url:'https://chat.deepseek.com/a/chat'};};
+ await f.controller.mount(f.host);f.view.dispatchEvent(new Event('dom-ready'));f.view.dispatchEvent(new Event('did-stop-loading'));
+ assert.equal(reads,0);assert.equal((await f.controller.readContext()).source.url,'https://chat.deepseek.com/a/chat');
+ f.view.getURL=()=> 'https://example.org/';await assert.rejects(f.controller.readContext(),/官网/);assert.equal(reads,1);
+ await f.controller.dispose();
+});
+
+test('late context snapshots are rejected after closing or navigation',async()=>{
+ const f=fixture();let finish;let url='https://chat.deepseek.com/a/chat';f.view.getURL=()=>url;
+ f.view.executeJavaScript=()=>new Promise(resolve=>{finish=resolve;});
+ await f.controller.mount(f.host);f.view.dispatchEvent(new Event('dom-ready'));f.view.dispatchEvent(new Event('did-stop-loading'));
+ const reading=f.controller.readContext();url='https://chat.deepseek.com/a/other';finish({text:'old context',kind:'messages',count:1,url:'https://chat.deepseek.com/a/chat'});
+ await assert.rejects(reading,/布局已变化或内容不完整/);
+ const late=f.controller.readContext();await f.controller.dispose();finish({text:'old context',kind:'messages',count:1,url});await assert.rejects(late,/页面已关闭/);
+});

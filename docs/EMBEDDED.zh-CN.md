@@ -1,25 +1,27 @@
-# 官网内嵌模式
+# 内嵌官网与项目交接
 
-当前版本 0.1.0-preview.6；核实日期 2026-11-02。仅提供官网内嵌，旧版 Chrome 面板与相关代码已经移除。
+版本 0.1.0-preview.7；2026-11-02。
 
-## 实现
+## 容器
 
-主面板使用本机 `window.dshDesktop.browser.acquire/release/onOpenRequested`，遵循内置 Sidebar Browser 的获批租约流程：配置主进程发放的 partition 与 `about:blank#<lease>`，待宿主批准后导航 `https://chat.deepseek.com/`。
+沿用官方 Sidebar Browser 的 main-approved lease / partition / about:blank bootstrap。保留 sandbox、contextIsolation、webSecurity、无 guest preload 与无 Node 集成，不修改 App 包、安全策略或 User-Agent。只使用 `window.dshDesktop.browser.acquire/release/onOpenRequested` 创建和回收容器。
 
-主进程强制关闭 Node，开启上下文隔离、sandbox 与 webSecurity。插件不添加 guest preload、脚本注入、自定义 User-Agent 或 disablewebsecurity。HTTPS 弹出页面由宿主审核后在同一个内嵌容器中导航，不自动打开独立浏览器。
+同一次主进程运行中，各项目使用相同获批浏览器分区以沿用官网登录；项目分别记住自己的官网对话路径。官方 0.2.1-rc.5 使用内存分区，完全退出后登录失效，插件没有持久化开关。
 
-官网负责消息、历史、输入和回复，本插件没有消息读取接口、模型适配器或付费模型回退。顶栏只保留实际刷新页面和返回原 DSH 会话两个操作。
+## 显式网页读取
 
-## 登录
+preview.7 新增用户主动点击后的只读 `webview.executeJavaScript` 快照。与旧版 Chrome 桥接不同，它不发消息、不控制表单、不监听聊天流，不在后台轮询；本机没有独立插件浏览器进程。
 
-当前 Desktop 的 `DesktopBrowserGuests.acquire` 为同一个存储分组分配进程内 `dsh-sidebar-browser-<随机ID>` partition，没有 `persist:` 前缀。租约释放不会立刻清空分组，完全退出应用则丢失内存会话。插件不能自行开启持久化，不提取登录 Cookie，也不复制其他浏览器的登录数据。
+读取函数仅访问识别到的已渲染消息容器及其中选中的文字，不访问 Cookie、存储、网络、输入框值或应用内部状态。消息源码中的验证控件和生成状态用于阻止读取，不会操作或绕过它们。仅允许 HTTPS 的 chat.deepseek.com；来源 URL 去掉查询参数和片段。
 
-因此同次运行可以沿用登录，跨重启不能记住。切换或刷新前需保存未发送草稿。用户登录、验证码和页面限制均在官网中自行处理。
+未知布局、无消息、验证/限流、过长、超时和导航变化保留原项目内容，显示手动粘贴入口。页面是动态网站，不保证捕获未加载历史、附件或完整 Markdown；必须在资料区检查。
 
-## 依据和实测边界
+## 原生 Work
 
-参考：[官方 Sidebar Browser](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-sidebar-browser/README.md)、[Electron webview 文档](https://www.electronjs.org/docs/latest/api/webview-tag)。Desktop bridge 的其他版本或社区包装兼容性未保证。
+客户端注入官方 sessions/workspaces/uiWorkspace/conversation 服务。`sessions.create({workspaceId})` 创建原生项目会话，短期 retain 后经 `conversation.input.for(binding.ctx).requestDraftInitialization({prompt,whenDraftExists:'keep'})` 填入草稿，再 `uiWorkspace.openSession` 导航。已有草稿不覆盖，异步离开后不劫持导航，失败可复用已创建的准备会话。
 
-在本机官方 Desktop 0.2.1-rc.5 / macOS arm64 中，主面板显示了官网首页、DeepThink/Search 和输入框；顶栏返回原会话、再进入 Chat 已验证；检查时独立插件 Chrome 进程为 0。
+交接不调用 prompt/send，不写 DSH 持久化文件，不选择模型、不切换权限；发送和后续任务由原生 DSH 管理。Work 最新回复从官方已加载事件窗口读取公开 text 块，不读取工具参数或 reasoning 块；它是显式导入，不是持续同步。
 
-用户在内嵌网页中的实际登录、验证码、真实聊天与更多操作系统仍未记为验证通过。网页拒绝内嵌时只显示失败提示，不更改安全策略或伪装客户端。
+## 本地资料
+
+`dsh-chatgpt-panel.projects.v1` 页面存储按 workspaceId 分隔资料、聊天快照、任务、导入回复与已准备会话 ID。不是官网记忆服务，也不自动注入所有 DSH 请求。存储失败有可见提示。官网登录不在这个存储中。
