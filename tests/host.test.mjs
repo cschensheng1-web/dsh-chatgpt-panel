@@ -28,7 +28,10 @@ test('host and origin guards reject lookalikes, cross-site and state-changing GE
   assert.equal(isTrusted(request('POST',{}, {host:'localhost.attacker.test:1234',origin:'http://localhost.attacker.test:1234'}),true),false);
   assert.equal(isTrusted(request('POST',{}, {origin:'https://attacker.test'}),true),false);
   assert.equal(isTrusted(request('POST',{}, {'x-dsh-chat':undefined}),true),false);
-  assert.equal(isTrusted(request('POST',{}, {origin:undefined}),true),false);
+  assert.equal(isTrusted(request('POST',{}, {origin:undefined,'sec-fetch-site':undefined}),true),true);
+  assert.equal(isTrusted(request('POST',{}, {origin:'null'}),true),false);
+  assert.equal(isTrusted(request('POST',{}, {origin:undefined,'sec-fetch-site':'same-site'}),true),false);
+  assert.equal(isTrusted(request('POST',{}, {origin:undefined,'content-type':'text/plain'}),true),false);
   assert.equal(isTrusted(request('GET',{}, {'sec-fetch-site':'cross-site'})),false);
 });
 

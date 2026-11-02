@@ -13,8 +13,11 @@ export function isTrusted(req, mutation = false) {
   } catch { return false; }
   const origin = req.headers.origin;
   if (origin && origin !== target.origin) return false;
-  if (req.headers['sec-fetch-site'] === 'cross-site') return false;
-  if (mutation && (!origin || req.headers['x-dsh-chat'] !== '1' || !/^application\/json(?:;|$)/i.test(req.headers['content-type'] ?? ''))) return false;
+  if (['cross-site', 'same-site'].includes(req.headers['sec-fetch-site'])) return false;
+  // Desktop's dsh-app://app protocol forwards to the local Host after removing
+  // Origin and Sec-Fetch-Site. Their absence is not authentication: keep the
+  // loopback/Host checks and require a non-simple JSON request with our header.
+  if (mutation && (req.headers['x-dsh-chat'] !== '1' || !/^application\/json(?:;|$)/i.test(req.headers['content-type'] ?? ''))) return false;
   return true;
 }
 async function readBody(req) {
