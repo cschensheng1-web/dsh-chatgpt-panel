@@ -1,6 +1,6 @@
 # DSH DeepSeek 项目 Chat / Work（预览版）
 
-版本：`0.1.0-preview.7`。独立社区插件，在 DSH Mac 桌面版中使用 DeepSeek 官网免费 Chat，并将核对过的聊天上下文交接给同一项目的原生 DSH Work 会话。没有独立 Chrome，也没有免费网页 API 承诺。
+版本：`0.1.0-preview.8`。独立社区插件，在 DSH Mac 桌面版中使用 DeepSeek 官网免费 Chat，并将核对过的聊天上下文交接给同一项目的原生 DSH Work 会话。没有独立 Chrome，也没有免费网页 API 承诺。
 
 ## 使用
 
@@ -39,7 +39,13 @@ dsh plugin --profile desktop add github:cschensheng1-web/dsh-chatgpt-panel
 
 `lib/client.js` 已构建，无运行时外部依赖。支持本地目录安装；安装会建立链接，请保留目录。当前管理器更新第三方 GitHub 插件可能需要卸载后重装，网络问题仍会影响下载。
 
-本版本面向官方 DSH Desktop `0.2.1-rc.5` / macOS arm64。网页容器、Session Controller、Workspace 和 composer 接口均属预览版能力，后续 DSH 更新可能需要适配。测试范围见 [测试记录](docs/TESTING.zh-CN.md)。
+项目界面已在官方 DSH Desktop `0.2.1-rc.5` / macOS arm64 验证；本版新增的请求兼容修复已使用本机 `0.2.2-rc.1` 实际运行时离线验证。网页容器、Session Controller、Workspace 和 composer 接口均属预览版能力，后续 DSH 更新可能需要适配。测试范围见 [测试记录](docs/TESTING.zh-CN.md)。
+
+## 原生会话工具兼容修复
+
+preview.8 集成经过审查的 MIT 社区修复，处理原生会话的 `All tools cannot be deferred` / `INVALID_REQUEST`：在符合条件的请求副本中加入一个不可执行的兼容占位工具。不修改聊天历史或权限，也不把官网 Chat 切换到付费 API。
+
+如果服务端已经开始输出内容，不会重发；只有明确的全延迟工具拒绝可能触发一次修正重试。此修复针对工具声明格式，不解决余额、网络或登录问题。来源与许可证见 NOTICE。
 
 ## 开发
 

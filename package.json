@@ -1,6 +1,6 @@
 {
   "name": "dsh-chatgpt-panel",
-  "version": "0.1.0-preview.7",
+  "version": "0.1.0-preview.8",
   "description": "Project-scoped DeepSeek web Chat with reviewed context handoff to native DSH Work drafts.",
   "type": "module",
   "license": "Apache-2.0",

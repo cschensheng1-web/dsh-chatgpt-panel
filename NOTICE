@@ -11,3 +11,8 @@ project's web-message transport.
 
 React is provided by the DSH host. Development dependencies retain their own
 licenses and are not bundled in the production client.
+
+Deferred-tool request compatibility: src/compat/all-deferred-tools-guard is
+vendored from @argszero/dsh-all-deferred-tools-guard 0.1.0 (MIT). Its license is
+preserved in that directory. Upstream: https://github.com/argszero/dsh-all-deferred-tools-guard
+The request shape is tested against the locally installed DSH 0.2.2-rc.1.
