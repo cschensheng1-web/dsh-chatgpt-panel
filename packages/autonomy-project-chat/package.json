@@ -1,0 +1,54 @@
+{
+  "name": "dsh-autonomy",
+  "version": "0.1.5-project-read.1",
+  "description": "Community adaptation of dsh-autonomy: project-scoped read-only Chat, normal Agent, same session.",
+  "type": "module",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "scripts",
+    "tests",
+    "LICENSE",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES.txt",
+    "README.md",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.2-rc.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cschensheng1-web/dsh-chatgpt-panel.git",
+    "directory": "packages/autonomy-project-chat"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "3.19.0",
+    "esbuild": "0.25.12",
+    "zod": "4.4.3"
+  }
+}

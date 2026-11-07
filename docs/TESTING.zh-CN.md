@@ -20,7 +20,7 @@ env -u NODE_TLS_REJECT_UNAUTHORIZED ELECTRON_RUN_AS_NODE=1 \
   scripts/test-installed-runtime.mjs
 ```
 
-真实用户会话下一条模型回复未代发验证；旧报错会保留在历史中。
+实际 Mac 客户端已确认 preview.8 组件处于运行中；用户继续原失败会话后，已观察到新的完成回复。测试没有代发用户任务。旧报错会保留在历史中；后续曾出现的 TRANSPORT 网络错误属于另一个错误类别，不能由工具声明修复解决。
 
 ## 本机项目界面实测
 
