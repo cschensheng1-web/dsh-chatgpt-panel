@@ -1,6 +1,6 @@
 {
   "name": "dsh-autonomy",
-  "version": "0.1.5-project-read.1",
+  "version": "0.1.5-project-read.2",
   "description": "Community adaptation of dsh-autonomy: project-scoped read-only Chat, normal Agent, same session.",
   "type": "module",
   "license": "MIT",
@@ -33,7 +33,7 @@
     }
   },
   "engines": {
-    "node": ">=22.19.0",
+    "node": ">=24.0.0",
     "dsh": "0.2.2-rc.1"
   },
   "repository": {
@@ -48,7 +48,15 @@
   },
   "devDependencies": {
     "@deepseek-ai/schemastery": "3.19.0",
+    "cfb": "1.2.2",
     "esbuild": "0.25.12",
-    "zod": "4.4.3"
+    "htmlparser2": "12.0.0",
+    "pdfjs-dist": "6.4.299",
+    "saxes": "6.0.0",
+    "unpdf": "2.1.0",
+    "word-extractor": "1.0.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "yauzl": "3.4.0",
+    "zod": "4.6.7"
   }
 }

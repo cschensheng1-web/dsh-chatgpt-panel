@@ -14,7 +14,7 @@ Work 页用于管理和交接原生 DSH 会话；执行任务时打开原生对�
 
 ## 原生 Autonomy Chat 读取项目
 
-如果你使用的是原生会话里的 Autonomy Chat，原版会把读取工具一并关闭。本仓库提供可单独安装的 [Autonomy 项目只读 Chat 改造](packages/autonomy-project-chat/README.md)：可以查找和读取当前项目的 UTF-8 文字资料，切换 Agent 后沿用同一会话上下文，使用 DSH 当前模型及原额度。它不改变左侧官网 Chat，也不解析 PDF、Word。需要按子包说明安装，更新本面板不会自动替换 Autonomy。
+如果你使用的是原生会话里的 Autonomy Chat，原版会把读取工具一并关闭。本仓库提供可单独安装的 [Autonomy 项目只读 Chat 改造](packages/autonomy-project-chat/README.md)：可以查找和读取当前项目的 Word、PPT、PDF 文字层、Excel、OpenDocument、EPUB 和普通文字资料，也可读取 ZIP 内文档；切换 Agent 后沿用同一会话上下文，使用 DSH 当前模型及原额度。它不改变左侧官网 Chat。需要按子包说明安装，更新本面板不会自动替换 Autonomy。
 
 ## 上下文与记忆范围
 

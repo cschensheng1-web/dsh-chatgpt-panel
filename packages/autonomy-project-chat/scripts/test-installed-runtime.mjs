@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import * as autonomy from '../lib/index.js';
 import { parseReadProgram } from '../src/project-files.mjs';
+import { wordFixture, zipFixture, pdfFixture } from '../tests/document-fixtures.mjs';
 const base = '/Applications/DeepSeek Harness.app/Contents/Resources/app.asar/dsh';
 const require = createRequire(base + '/package.json');
 const load = name => import(pathToFileURL(require.resolve('@deepseek-ai/' + name)).href);
@@ -21,13 +22,16 @@ const { default: LocalFs } = await load('dsh-fs-local');
 const { createScope } = await load('dsh-scope');
 const Native = await load('dsh-tool-executor-native');
 const Ptc = await load('dsh-tool-executor-ptc');
-const readNames = ['autonomy_list_files', 'autonomy_read_file', 'autonomy_search_text'];
+const readNames = ['autonomy_list_archive', 'autonomy_list_files', 'autonomy_read_file', 'autonomy_search_text'];
 const signal = () => new AbortController().signal;
 const events = session => session.snapshotEvents?.() ?? session.events;
 
 async function fixture(t, mode = 'native', config = {}, lateFs = false) {
   const root = await fs.mkdtemp('/private/tmp/dsh-autonomy-integration-');
   await fs.writeFile(path.join(root, 'source.md'), '# 项目来源\n关系数据库遵循约束\n');
+  await fs.writeFile(path.join(root, 'source.docx'), wordFixture());
+  await fs.writeFile(path.join(root, 'source.pdf'), pdfFixture());
+  await fs.writeFile(path.join(root, 'sources.zip'), zipFixture([['inside.docx', wordFixture()]]));
   const ctx = new Context(); const fibers = []; let probes = 0; let programs = 0;
   const mount = async (plugin, config) => { const f = await ctx.plugin(plugin, config); fibers.push(f); return f; };
   t.after(async () => { for (const f of fibers.reverse()) await f.dispose(); await fs.rm(root, { recursive: true, force: true }); });
@@ -94,6 +98,11 @@ for (const executor of ['native', 'ptc']) test(`${executor}: Chat reads real pro
   assert.equal((await f.execute(a, 'run_code', { code: 'return await tools.write_probe({});', description: 'offline' })).isError, true);
   assert.equal((await f.execute(a, 'run_code', { code: 'return await tools.autonomy_read_file({"file_path":"source.md"});', description: 'offline', sandbox_permissions: 'require_escalated', justification: 'fixture' })).isError, true);
   assert.deepEqual(f.counts(), { probes: 0, programs: executor === 'ptc' ? 2 : 0 });
+  assert.match((await read({ file_path: 'source.docx' })).content[0].text, /中文项目资料/);
+  assert.match((await read({ file_path: 'source.pdf' })).content[0].text, /中文/);
+  assert.match((await read({ file_path: 'sources.zip', archive_entry: 'inside.docx' })).content[0].text, /脚注说明/);
+  const list = executor === 'ptc' ? await f.execute(a, 'run_code', { code: 'return await tools.autonomy_list_archive({"file_path":"sources.zip"});', description: 'List offline archive' }) : await f.execute(a, 'autonomy_list_archive', { file_path: 'sources.zip' });
+  assert.notEqual(list.isError, true, JSON.stringify(list)); assert.match(list.content[0].text, /inside.docx/);
   await f.command(a, 'agent');
   assert.equal(a.session, session);
   assert.equal(f.ctx.tools.selectExecutor(a), original);

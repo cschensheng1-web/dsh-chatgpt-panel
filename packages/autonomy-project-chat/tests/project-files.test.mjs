@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createProjectReader, parseReadProgram } from '../src/project-files.mjs';
+import { wordFixture, presentationFixture, zipFixture } from './document-fixtures.mjs';
 
 async function fixture(t) {
   const temp = await fs.mkdtemp('/private/tmp/dsh-project-reader-');
@@ -64,12 +65,12 @@ test('credential names and aliases are blocked in read, search and listings', as
   assert.equal(f.reads.length, 0);
 });
 
-test('binary, malformed UTF-8 and oversized files return explicit errors', async t => {
+test('malformed documents, invalid encodings and oversized files return explicit errors', async t => {
   const f = await fixture(t);
-  await f.write('document.pdf', '%PDF-1.4\0fixture'); await f.write('bad.txt', Buffer.from([0xc3, 0x28])); await f.write('large.txt', 'x'.repeat(512 * 1024 + 1));
-  await assert.rejects(f.reader.read({ file_path: 'document.pdf' }, f.exec), /文本/);
-  await assert.rejects(f.reader.read({ file_path: 'bad.txt' }, f.exec), /UTF-8/);
-  await assert.rejects(f.reader.read({ file_path: 'large.txt' }, f.exec), /512 KiB/);
+  await f.write('document.pdf', '%PDF-1.4\0fixture'); await f.write('bad.txt', Buffer.from([0xc3, 0x28])); await f.write('large.txt', Buffer.alloc(32 * 1024 * 1024 + 1));
+  await assert.rejects(f.reader.read({ file_path: 'document.pdf' }, f.exec), /PDF/);
+  await assert.rejects(f.reader.read({ file_path: 'bad.txt' }, f.exec), /编码/);
+  await assert.rejects(f.reader.read({ file_path: 'large.txt' }, f.exec), /32 MiB/);
 });
 
 test('long text is bounded and visibly marked as incomplete', async t => {
@@ -119,4 +120,24 @@ test('PTC read transport admits one JSON-only read and rejects executable syntax
     'const a = {}; return await tools.autonomy_read_file(a);',
   ]) assert.equal(parseReadProgram({ code: value, description: 'read' }), undefined, value);
   assert.equal(parseReadProgram({ code, description: 'read', sandbox_permissions: 'require_escalated' }), undefined);
+  assert.equal(parseReadProgram({ code: 'return await tools.autonomy_list_archive({"file_path":"sources.zip"});' }).name, 'autonomy_list_archive');
+});
+
+test('project tools parse, paginate and search document text with file and slide locations', async t => {
+  const f = await fixture(t); await f.write('notes.docx', wordFixture()); await f.write('slides.pptx', presentationFixture());
+  const result = await f.reader.read({ file_path: 'notes.docx', offset: 1, limit: 2 }, f.exec);
+  assert.equal(result.format, 'docx'); assert.match(result.text, /1: \[正文\]/); assert.equal(result.truncated, true);
+  const search = await f.reader.search({ query: '讲解备注' }, f.exec);
+  assert.equal(search.matches[0].path, 'slides.pptx'); assert.equal(search.matches[0].location, '第 1 张备注');
+});
+
+test('ZIP tools share project boundaries, hide credentials and search named document members', async t => {
+  const f = await fixture(t);
+  await f.write('sources.zip', zipFixture([['notes.docx', wordFixture()], ['.env', 'SECRET'], ['credentials.json', 'SECRET']]));
+  const list = await f.reader.archive({ file_path: 'sources.zip' }, f.exec);
+  assert.equal(list.entries.length, 1); assert.equal(list.entries[0].supported, true);
+  assert.match((await f.reader.read({ file_path: 'sources.zip', archive_entry: 'notes.docx' }, f.exec)).text, /中文项目资料/);
+  assert.equal((await f.reader.search({ query: '中文项目资料' }, f.exec)).matches[0].archiveEntry, 'notes.docx');
+  await assert.rejects(f.reader.read({ file_path: 'sources.zip', archive_entry: '.env' }, f.exec), /凭据/);
+  await assert.rejects(f.reader.archive({ file_path: '../sources.zip' }, f.exec));
 });
