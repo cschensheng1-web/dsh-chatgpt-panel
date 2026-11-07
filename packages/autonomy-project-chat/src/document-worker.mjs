@@ -2,7 +2,7 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { openArchive, safeArchiveName } from './document-zip.mjs';
 import { wordXml, presentationXml, spreadsheetXml, openDocument, epub } from './document-office.mjs';
 import { oleContainer, legacyWord, legacyPresentation, legacySpreadsheet } from './document-binary.mjs';
-import { DOCUMENT_LIMITS, DOCUMENT_EXTENSIONS, extension, decodeText, htmlText, rtfText, textResult } from './document-common.mjs';
+import { DOCUMENT_LIMITS, DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, extension, decodeText, htmlText, rtfText, textResult } from './document-common.mjs';
 
 globalThis.fetch = async () => { throw Error('文档解析器不访问网络。'); };
 const privateName = name => name.split('/').some(part => /^(?:\.git|\.ssh|\.aws|\.gnupg|\.azure|\.kube|\.env(?:\..*)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|(?:credentials|secrets|tokens?)\.(?:json|ya?ml|toml))$/i.test(part) || /\.(?:pem|key|p12|pfx|keystore)$/i.test(part));
@@ -27,7 +27,7 @@ async function parse(bytes, name, options = {}) {
         if (!safeArchiveName(options.entry) || privateName(options.entry)) throw Error('不能读取此 ZIP 条目路径或凭据文件。');
         const data = await zip.read(options.entry);
         if (isZip(data) && extension(options.entry) === 'zip') throw Error('不递归展开嵌套压缩包，请选择其中的文档。');
-        const result = await parse(data, options.entry);
+        const result = await parse(data, options.entry, { ocr: options.ocr, page: options.page });
         if (result.format === 'zip') throw Error('不递归展开嵌套压缩包。');
         return result;
       }
@@ -53,7 +53,15 @@ async function parse(bytes, name, options = {}) {
     if (ole.stream('Workbook') || ole.stream('Book')) return legacySpreadsheet(bytes);
     throw Error('这个旧版二进制容器不是受支持的 Word、PPT 或 Excel 文档。');
   }
-  if (bytes.subarray(0, 1024).includes(Buffer.from('%PDF-'))) return (await import('./document-pdf.mjs')).pdfText(bytes);
+  const image = IMAGE_EXTENSIONS.has(ext);
+  const pdf = bytes.subarray(0, 1024).includes(Buffer.from('%PDF-'));
+  if (image || pdf && options.ocr) return { ocrInput: { bytes, kind: pdf ? 'pdf' : 'image', page: options.page ?? 1, limit: 1 } };
+  if (pdf) {
+    const result = await (await import('./document-pdf.mjs')).pdfText(bytes);
+    if (process.platform === 'darwin' && !result.sections.some(s => s.text.trim())) return { ocrInput: { bytes, kind: 'pdf', page: options.page ?? 1, limit: options.page === undefined ? 3 : 1 } };
+    return result;
+  }
+  if (options.ocr) throw Error('此文档不能直接 OCR；请提供图片或 PDF 页面。');
   const out = textResult(ext || 'text');
   if (/^\s*\{\\rtf\d/.test(bytes.subarray(0, 40).toString('latin1'))) { out.result.format = 'rtf'; out.add('正文', rtfText(bytes)); }
   else if (['html', 'htm', 'xhtml'].includes(ext)) { const body = htmlText(bytes, name); out.result.encoding = body.encoding; out.add('正文', body.text); }

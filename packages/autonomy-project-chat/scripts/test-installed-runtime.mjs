@@ -31,6 +31,8 @@ async function fixture(t, mode = 'native', config = {}, lateFs = false) {
   await fs.writeFile(path.join(root, 'source.md'), '# 项目来源\n关系数据库遵循约束\n');
   await fs.writeFile(path.join(root, 'source.docx'), wordFixture());
   await fs.writeFile(path.join(root, 'source.pdf'), pdfFixture());
+  await fs.copyFile(new URL('../tests/fixtures/ocr-source.png', import.meta.url), path.join(root, 'source.png'));
+  await fs.copyFile(new URL('../tests/fixtures/ocr-scan.pdf', import.meta.url), path.join(root, 'scan.pdf'));
   await fs.writeFile(path.join(root, 'sources.zip'), zipFixture([['inside.docx', wordFixture()]]));
   const ctx = new Context(); const fibers = []; let probes = 0; let programs = 0;
   const mount = async (plugin, config) => { const f = await ctx.plugin(plugin, config); fibers.push(f); return f; };
@@ -100,6 +102,8 @@ for (const executor of ['native', 'ptc']) test(`${executor}: Chat reads real pro
   assert.deepEqual(f.counts(), { probes: 0, programs: executor === 'ptc' ? 2 : 0 });
   assert.match((await read({ file_path: 'source.docx' })).content[0].text, /中文项目资料/);
   assert.match((await read({ file_path: 'source.pdf' })).content[0].text, /中文/);
+  assert.match((await read({ file_path: 'source.png' })).content[0].text, /数据库课程/);
+  assert.match((await read({ file_path: 'scan.pdf', ocr: true, page: 1 })).content[0].text, /SELECT student/);
   assert.match((await read({ file_path: 'sources.zip', archive_entry: 'inside.docx' })).content[0].text, /脚注说明/);
   const list = executor === 'ptc' ? await f.execute(a, 'run_code', { code: 'return await tools.autonomy_list_archive({"file_path":"sources.zip"});', description: 'List offline archive' }) : await f.execute(a, 'autonomy_list_archive', { file_path: 'sources.zip' });
   assert.notEqual(list.isError, true, JSON.stringify(list)); assert.match(list.content[0].text, /inside.docx/);

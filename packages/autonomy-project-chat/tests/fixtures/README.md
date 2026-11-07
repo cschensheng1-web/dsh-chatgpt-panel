@@ -6,3 +6,5 @@ These contain only generated Chinese test text, two slide notes, and a cell form
 - `legacy-table.xls`: worksheet 中文资料, A1 中文单元格, B1 42, C1 formula B1+1 and cached value 43.
 
 The separate in-code PPT fixture exercises incremental save references and deleted content, which these ordinary converted files do not test.
+
+OCR fixtures (`ocr-*`) are generated raster images with Chinese/English test text. The scanned PDFs embed those images without a text layer. The TIFF contains two frames; the four-page scan checks explicit partial-page reporting. No user screenshots or private documents are included.

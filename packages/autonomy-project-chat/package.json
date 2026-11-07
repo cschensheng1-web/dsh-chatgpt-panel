@@ -1,6 +1,6 @@
 {
   "name": "dsh-autonomy",
-  "version": "0.1.5-project-read.2",
+  "version": "0.1.5-project-read.3",
   "description": "Community adaptation of dsh-autonomy: project-scoped read-only Chat, normal Agent, same session.",
   "type": "module",
   "license": "MIT",

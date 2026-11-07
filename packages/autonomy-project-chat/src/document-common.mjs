@@ -3,7 +3,8 @@ import { Parser as HtmlParser } from 'htmlparser2';
 
 export const DOCUMENT_LIMITS = Object.freeze({ inputBytes: 32 * 1024 * 1024, entryBytes: 16 * 1024 * 1024, expandedBytes: 64 * 1024 * 1024, entries: 1500, textChars: 2_000_000, units: 600, xmlElements: 500000 });
 export const TEXT_EXTENSIONS = new Set('txt md markdown csv tsv json jsonl yaml yml xml html htm xhtml log sql tex rst ini cfg conf srt vtt c cpp h hpp py js jsx ts tsx java sh css r vue go rs rb toml properties'.split(' '));
-export const DOCUMENT_EXTENSIONS = new Set([...TEXT_EXTENSIONS, ...'doc docx docm dot dotx dotm ppt pptx pptm pps ppsx pot potx pdf xls xlsx xlsm xlsb xlt xltx ods odt odp ott otp rtf epub'.split(' ')]);
+export const IMAGE_EXTENSIONS = new Set('png jpg jpeg webp gif bmp tif tiff heic heif'.split(' '));
+export const DOCUMENT_EXTENSIONS = new Set([...TEXT_EXTENSIONS, ...IMAGE_EXTENSIONS, ...'doc docx docm dot dotx dotm ppt pptx pptm pps ppsx pot potx pdf xls xlsx xlsm xlsb xlt xltx ods odt odp ott otp rtf epub'.split(' ')]);
 export const extension = name => String(name).split('.').at(-1).toLowerCase();
 export function cleanText(text) { return String(text ?? '').replace(/\r\n?/g, '\n').replace(/\x07/g, '\t').replace(/[\v\f]/g, '\n').replace(/[\u0000-\u0008\u000e-\u001f]/g, '').replace(/\n[ \t]+/g, '\n').trim(); }
 export function textResult(format) {

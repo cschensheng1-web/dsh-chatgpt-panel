@@ -1,6 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { DOCUMENT_LIMITS, extension } from './document-common.mjs';
+import { nativeOCR, isImage } from './image-ocr.mjs';
 
 const workerUrl = new URL(import.meta.url.endsWith('/src/document-reader.mjs') ? '../lib/parser/document-worker.js' : './parser/document-worker.js', import.meta.url);
 let active = 0;
@@ -46,7 +47,21 @@ export function createDocumentParser() {
       signal?.throwIfAborted();
       const key = createHash('sha256').update(bytes).update('\0' + extension(name) + '\0' + JSON.stringify(options)).digest('hex');
       if (cache.has(key)) { const value = cache.get(key); cache.delete(key); cache.set(key, value); return value.result; }
-      const result = await run(bytes, name, options, signal); signal?.throwIfAborted();
+      const pdf = Buffer.from(bytes).subarray(0, 1024).includes(Buffer.from('%PDF-'));
+      const image = isImage(bytes, name);
+      if (options.page !== undefined && (!Number.isSafeInteger(options.page) || options.page < 1 || options.page > 600)) throw Error('page 必须是 1 到 600 的整数。');
+      if (options.ocr && !pdf && !image && !options.entry) throw Error('ocr:true 仅用于图片或 PDF 页面；Word/PPT 中的嵌入图片尚未识别。');
+      const ocr = async (request, input = bytes) => { await acquire(signal); try { return await nativeOCR(input, request, signal); } finally { release(); } };
+      let result;
+      if (options.operation !== 'list' && !options.entry && (image || options.ocr && pdf)) result = await ocr({ kind: pdf ? 'pdf' : 'image', page: options.page ?? 1 });
+      else {
+        result = await run(bytes, name, options, signal);
+        if (result.ocrInput) {
+          const { bytes: input, ...request } = result.ocrInput;
+          result = await ocr(request, input);
+        }
+      }
+      signal?.throwIfAborted();
       const size = JSON.stringify(result).length * 2;
       if (size <= 8 * 1024 * 1024) {
         cache.set(key, { result, size }); total += size;

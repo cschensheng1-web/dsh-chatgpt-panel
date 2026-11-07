@@ -1,6 +1,8 @@
 import { build } from 'esbuild';
 import { mkdir, copyFile, readFile, writeFile, readdir, cp, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve, relative, join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+execFileSync(process.execPath, ['scripts/build-native.mjs'], { stdio: 'inherit' });
 await mkdir('lib/parser', { recursive: true });
 const options = { bundle: true, format: 'esm', platform: 'node', target: 'node24', legalComments: 'eof', metafile: true };
 const parser = await build({ ...options, entryPoints: ['src/document-worker.mjs'], outdir: 'lib/parser', splitting: true, chunkNames: '[name]-[hash]', minify: true,
